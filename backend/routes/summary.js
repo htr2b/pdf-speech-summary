@@ -9,7 +9,10 @@ import path from 'path'
 dotenv.config()
 import express from "express"
 
+
 const input = fs.readFileSync(path.join(process.cwd(), 'input.txt'), 'utf-8')
+
+
 // const gemini = new Gemini(process.env.API_KEY) 
 // const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
