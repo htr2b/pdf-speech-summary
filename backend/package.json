@@ -1,0 +1,23 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "htr2b",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "cohere-ai": "^7.17.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "fs": "^0.0.1-security",
+    "gemini-ai": "^2.2.1",
+    "openai": "^5.9.2",
+    "path": "^0.12.7"
+  }
+}
