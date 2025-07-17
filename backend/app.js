@@ -12,12 +12,6 @@ app.get('/', (req, res) => {
 
 app.use('/summary', summaryRouter)
 
-app.get('/summary', (req, res) => {
-    console.log("Received summary request")
-    res.send(res.data)
-    console.log("End of summary request")
-
-})
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
