@@ -10,17 +10,14 @@ dotenv.config()
 
 const router = Router()
 
-// 1) Cohere istemcisini API key ile başlatın
 const cohere = new CohereClientV2({
     apiKey: process.env.COHERE_API_KEY
 })
 
-// 2) Dosya yollarınızı sabitleyin
 const INPUT_FILE = path.join(process.cwd(), 'input.txt')
 const PROMPT_FILE = path.join(process.cwd(), 'prompt.txt')
 const OUTPUT_FILE = path.join(process.cwd(), 'output.txt')
 
-// 3) Metni cümlelere bölüp parçalara ayıracak yardımcı
 function chunkText(sentences, maxWords) {
     const chunks = []
     let current = [], count = 0
@@ -40,10 +37,8 @@ function chunkText(sentences, maxWords) {
     return chunks
 }
 
-// 4) GET /summary → en güncel input.txt’i oku , özetle, hem JSON dön hem de output.txt’e yaz
 router.get('/', async (req, res, next) => {
     try {
-        // 4.1) input ve prompt’u her istekte okuyun
         const [inputText, prompt] = await Promise.all([
             fs.readFile(INPUT_FILE, 'utf8'),
             fs.readFile(PROMPT_FILE, 'utf8')
@@ -55,35 +50,29 @@ router.get('/', async (req, res, next) => {
                 .json({ status: 'error', message: 'input.txt boş.' })
         }
 
-        // 4.2) cümlelere böl ve 100 kelimelik parçalara ayır
         const sentences = nlp(inputText).sentences().out('array')
         const chunks = chunkText(sentences, 100)
 
-        // 4.3) Cohere chat çağrısı
-        const response = await cohere.chat({
+        const response = await cohere.summarize({
             model: 'command-a-03-2025',
             messages: [{
                 role: 'user',
-                content: prompt + "\n\n" + chunks.join("\n\n")
+                text: chunks.join(" ")
             }]
         })
 
-        // 4.4) API yanıtından özet metnini çek
-        // CohereClientV2 chat API'sı, choices dizisi yerine message.content içinde de olabilir:
         const summaryText = (
             response.choices?.[0]?.message?.content
             || response.message?.content?.[0]?.text
             || ''
         ).trim()
 
-        // 4.5) Özet metnini output.txt’e yaz (tek satıra sıkıştırılmış)
         const normalized = summaryText
             .replace(/[\r\n]+/g, ' ')
             .replace(/\s+/g, ' ')
             .trim()
         await fs.writeFile(OUTPUT_FILE, normalized, 'utf8')
 
-        // 4.6) İstemciye JSON ile dönün
         res.json({ status: 'success', summary: summaryText })
 
     } catch (err) {
