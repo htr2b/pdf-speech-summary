@@ -1,119 +1,95 @@
-// import Gemini from "gemini-ai" 
-// import OpenAI from "openai"
-
-import { CohereClientV2 } from "cohere-ai"
-import nlp from "compromise"
-import dotenv from "dotenv"
-import fs from 'fs'
+// routes/summary.js
+import { Router } from 'express'
+import fs from 'fs/promises'
 import path from 'path'
+import { CohereClientV2 } from 'cohere-ai'
+import nlp from 'compromise'
+import dotenv from 'dotenv'
+
 dotenv.config()
-import express from "express"
 
+const router = Router()
 
-
-
-// const gemini = new Gemini(process.env.API_KEY) 
-// const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-const input = fs.readFileSync(path.join(process.cwd(), 'input.txt'), 'utf-8')
-const summary = express.Router()
-const prompt = fs.readFileSync(path.join(process.cwd(), 'prompt.txt'), 'utf-8')
-
+// 1) Cohere istemcisini API key ile başlatın
 const cohere = new CohereClientV2({
+    apiKey: process.env.COHERE_API_KEY
 })
 
-function chunkText(sentences, maxWord) {
+// 2) Dosya yollarınızı sabitleyin
+const INPUT_FILE = path.join(process.cwd(), 'input.txt')
+const PROMPT_FILE = path.join(process.cwd(), 'prompt.txt')
+const OUTPUT_FILE = path.join(process.cwd(), 'output.txt')
+
+// 3) Metni cümlelere bölüp parçalara ayıracak yardımcı
+function chunkText(sentences, maxWords) {
     const chunks = []
-    let currentChunk = []
-    let currentWordCount = 0
-    for (const sentence of sentences) {
-        const words = sentence.split(' ').length
-        if (currentWordCount + words > maxWord) {
-            chunks.push(currentChunk.join(' '))
-            currentChunk = [sentence]
-            currentWordCount = words
+    let current = [], count = 0
+
+    for (const s of sentences) {
+        const w = s.split(' ').length
+        if (count + w > maxWords) {
+            chunks.push(current.join(' '))
+            current = [s]
+            count = w
         } else {
-            currentChunk.push(sentence)
-            currentWordCount += words
+            current.push(s)
+            count += w
         }
     }
-    if (currentChunk.length) {
-        chunks.push(currentChunk.join(' '))
-    }
+    if (current.length) chunks.push(current.join(' '))
     return chunks
 }
-const sentences = nlp(input).sentences().out('array')
-const chunks = chunkText(sentences, 100)
 
-summary.get("/", async (req, res) => {
+// 4) GET /summary → en güncel input.txt’i oku , özetle, hem JSON dön hem de output.txt’e yaz
+router.get('/', async (req, res, next) => {
     try {
+        // 4.1) input ve prompt’u her istekte okuyun
+        const [inputText, prompt] = await Promise.all([
+            fs.readFile(INPUT_FILE, 'utf8'),
+            fs.readFile(PROMPT_FILE, 'utf8')
+        ])
+
+        if (!inputText.trim()) {
+            return res
+                .status(400)
+                .json({ status: 'error', message: 'input.txt boş.' })
+        }
+
+        // 4.2) cümlelere böl ve 100 kelimelik parçalara ayır
+        const sentences = nlp(inputText).sentences().out('array')
+        const chunks = chunkText(sentences, 100)
+
+        // 4.3) Cohere chat çağrısı
         const response = await cohere.chat({
             model: 'command-a-03-2025',
-            messages: [
-                {
-                    role: 'user',
-                    content: prompt + "\n" + chunks.join("\n"),
-                },
-            ],
+            messages: [{
+                role: 'user',
+                content: prompt + "\n\n" + chunks.join("\n\n")
+            }]
         })
-        let summaryText = response.message.content[0].text
-        summaryText = summaryText.replace(/[\n\r]/g, '\n').replace(/\*\*/g, '')
-        res.send(`<div style="font-family:inherit;font-size:1rem;word-break:break-all;white-space:pre-line;">${summaryText}</div>`)
-        summaryText = summaryText
-            .replace(/<br>/g, ' ')
-            .replace(/[\n\r]/g, ' ')
-            .replace(/\*\*/g, '')
+
+        // 4.4) API yanıtından özet metnini çek
+        // CohereClientV2 chat API'sı, choices dizisi yerine message.content içinde de olabilir:
+        const summaryText = (
+            response.choices?.[0]?.message?.content
+            || response.message?.content?.[0]?.text
+            || ''
+        ).trim()
+
+        // 4.5) Özet metnini output.txt’e yaz (tek satıra sıkıştırılmış)
+        const normalized = summaryText
+            .replace(/[\r\n]+/g, ' ')
             .replace(/\s+/g, ' ')
             .trim()
-        writeSummarytoFile(summaryText)
-    } catch (error) {
-        console.log(error)
-        res.status(500).send({ error: "OpenAI API error" })
+        await fs.writeFile(OUTPUT_FILE, normalized, 'utf8')
+
+        // 4.6) İstemciye JSON ile dönün
+        res.json({ status: 'success', summary: summaryText })
+
+    } catch (err) {
+        console.error('Summary route error:', err)
+        next(err)
     }
 })
-const outputFile = path.join(process.cwd(), 'output.txt')
 
-
-function writeSummarytoFile(summaryText) {
-    if (!summaryText) {
-        console.error("No summary text provided")
-        return
-    }
-    fs.writeFile(outputFile, summaryText, 'utf-8', (err) => {
-        if (err) {
-            console.error("Error writing to file:", err)
-        }
-    })
-}
-// summary.get("/", async (req, res) => {
-//     try {
-//         const response = await client.chat.completions.create({
-//             model: "gpt-4o",
-//             messages: [
-//                 { role: "system", content: prompt },
-//                 { role: "user", content: input }
-//             ]
-//         })
-//         const summaryText = response.choices[0].message.content
-//         res.json({ summary: summaryText })
-//     } catch (error) {
-//         console.log(error)
-//         res.status(500).json({ error: "OpenAI API error" })
-//     }
-// })
-
-// summary.get("/", async (req, res) => {
-//     try {
-//         const response = await gemini.ask(input, prompt, {
-//             model: "gemini-1.5-flash",
-//             stream: console.log
-//         })
-//         res.send(response)
-//     } catch (error) {
-//         res.status(500).json({ error: "Gemini API error" })
-//     }
-// })
-
-
-
-export default summary
+export default router

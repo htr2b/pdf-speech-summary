@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sesli Özetleme Sistemi</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+
+  <div class="container">
+    <div class="row">
+      <div class="column">
+        <h2>Gelen Metin Alanı</h2>
+        <textarea id="incomingText" rows="12" placeholder="Gelen metin buraya gelecek..." readonly></textarea>
+        <div class="button-group">
+          <input type="file" id="audioUpload" />
+          <button id="summarizeButton">Gelen metni özetle</button>
+        </div>
+      </div>
+
+      <div class="column">
+        <h2>Özetlenen Metin Alanı</h2>
+        <textarea id="summary" rows="12" readonly></textarea>
+        <div class="button-group">
+          <button id="convertButton">🔁 Özetlenen metni sese çevir</button>
+          <button id="playButton" disabled>🎧 Sesi Dinle</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="audioSection" hidden>
+      <audio id="audioPlayer" controls></audio>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
